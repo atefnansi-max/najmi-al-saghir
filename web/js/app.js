@@ -3,7 +3,8 @@ import { BEHAVIORS, phrasesFor, behaviorLabel, parentMessage } from './phrases.j
 import { getScenes, getScene, sceneURL, sceneOverlayURL, matchScene, normalize, ACCESSORIES } from './scenes.js';
 import { shrink, smartCutout, circleSticker } from './cutout.js';
 import { compose, fontsReady, canvasBlob } from './compose.js';
-import { listen, voiceSupported } from './voice.js';
+import { listen, voiceSupported, voiceError } from './voice.js';
+import { findLetter, drawLetterBadge, LETTERS } from './magic.js';
 import { shareImage, openWhatsApp, openFacebook, downloadBlob, canShareFiles } from './share.js';
 
 const view = document.getElementById('view');
@@ -303,6 +304,7 @@ async function make(preId) {
     noText: false,
     mode: 'each',         // several kids: 'each' = one picture per child, 'group' = one picture for all
     paperStyle: 'real',
+    letter: 'ب',
   };
   const tag = `⭐ ${cfg.kg || 'نجمي الصغير'}${cfg.className ? ' · ' + cfg.className : ''}`;
 
@@ -353,9 +355,34 @@ async function make(preId) {
         </div>
         <div class="card">
           <div class="step-title"><span class="num">3</span><h3>وين بدك ياه؟</h3></div>
+          <div class="magic-box" id="magicBox">
+            <p style="margin:0 0 8px;font-weight:700">🔎 احكيلي شو المشهد</p>
+            <div class="phrase-row">
+              <input class="input" id="magicText" placeholder="مثلاً: قطف الزيتون، حرف الباء" autocomplete="off">
+              <button class="btn small" id="magicMic" aria-label="احكي المشهد" title="احكي المشهد">🎤</button>
+            </div>
+            <div class="chips" id="magicIdeas" style="margin:10px 0">
+              ${['🫒 قطف الزيتون', '🔤 حرف الباء', '🌙 رمضان', '🎓 التخرج', '📝 الامتحان', '🐪 الصحراء'].map(t => `<button class="chip c-purple" data-idea="${esc(t.slice(t.indexOf(' ') + 1))}">${esc(t)}</button>`).join('')}
+            </div>
+            <button class="btn primary block" id="magicGo">✨ لاقيلي المشهد</button>
+            <div class="magic-grid" id="magicGrid"></div>
+            <p class="note" id="magicNote" style="margin:8px 0 0"></p>
+            <p style="margin:14px 0 8px;font-weight:700">📷 أو خلفية من عندك</p>
+            <div class="two" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <label class="btn small">📸 صوّري خلفية<input type="file" accept="image/*" capture="environment" id="bgCam" hidden></label>
+              <label class="btn small">🖼️ من الصور<input type="file" accept="image/*" id="bgGal" hidden></label>
+            </div>
+          </div>
+          <p class="muted" style="margin:14px 0 8px;font-size:15px">أو اختاري مشهد جاهز:</p>
           <div class="strip" id="sceneStrip">
             ${getScenes().map(sc => `<button class="scene-btn" data-scene="${sc.id}" aria-pressed="false"><img src="${sceneURL(sc)}" alt=""><span>${sc.emoji} ${esc(sc.name)}</span></button>`).join('')}
-            <button class="scene-btn magic" id="magicBtn"><b>🪄</b><span>مشهد من وصفك</span></button>
+            <button class="scene-btn magic" id="magicBtn"><b>🔎</b><span>احكي المشهد</span></button>
+          </div>
+          <div class="hidden" id="letterRow" style="margin-top:8px">
+            <p class="muted" style="margin:0 0 6px;font-size:15px">اختاري الحرف:</p>
+            <div class="strip" id="letterStrip">
+              ${LETTERS.map(l => `<button class="acc-btn" data-letter="${l[1]}" aria-pressed="false" style="font-family:var(--font-title);font-weight:700">${l[1]}</button>`).join('')}
+            </div>
           </div>
           <p class="muted" style="margin:10px 0 8px;font-size:15px">زينة:</p>
           <div class="strip" id="accStrip">
@@ -414,9 +441,11 @@ async function make(preId) {
     const scene = getScene(state.sceneId);
     return {
       bgURL: state.magic ? state.magic.url : sceneURL(scene),
-      bgCors: !!state.magic,
+      bgCors: !!state.magic && !state.magic.local,
       overlayURL: state.magic ? null : sceneOverlayURL(scene),
-      decorate: state.magic ? null : scene.decorate,
+      decorate: state.magic
+        ? (state.magic.letter ? ctx => drawLetterBadge(ctx, state.magic.letter) : null)
+        : scene.decorate ? ctx => scene.decorate(ctx, state.letter) : null,
       acc: state.acc,
       paperStyle: state.paperStyle,
       tag,
@@ -428,6 +457,9 @@ async function make(preId) {
     $$('#chips [data-b]').forEach(b => b.setAttribute('aria-pressed', b.dataset.b === state.behavior));
     $$('#sceneStrip [data-scene]').forEach(b => b.setAttribute('aria-pressed', !state.magic && b.dataset.scene === state.sceneId));
     $('#magicBtn').setAttribute('aria-pressed', !!state.magic);
+    $('#letterRow').classList.toggle('hidden', !!state.magic || state.sceneId !== 'letter');
+    $$('#letterStrip [data-letter]').forEach(b => b.setAttribute('aria-pressed', b.dataset.letter === state.letter));
+    $$('#magicGrid [data-pick]').forEach(b => b.setAttribute('aria-pressed', !!state.magic && state.magic.url === b.dataset.pick));
     $$('#accStrip [data-acc]').forEach(b => b.setAttribute('aria-pressed', b.dataset.acc === state.acc));
     $('#paperStyles').classList.toggle('hidden', state.acc !== 'paper');
     $$('#paperStyles [data-ps]').forEach(b => b.setAttribute('aria-pressed', b.dataset.ps === state.paperStyle));
@@ -567,7 +599,7 @@ async function make(preId) {
   // Voice
   let rec = null;
   $('#mic').addEventListener('click', () => {
-    if (!voiceSupported) { toast('المايك مش شغّال بهالمتصفح، استخدمي Chrome أو اكتبي'); $('#story').focus(); return; }
+    if (!voiceSupported) { toast(voiceError('unsupported'), 5000); $('#story').focus(); return; }
     if (rec) { rec.stop(); return; }
     $('#mic').classList.add('on');
     $('#heard').textContent = 'عم بسمعك... 👂';
@@ -582,23 +614,107 @@ async function make(preId) {
       onError: err => {
         rec = null;
         $('#mic').classList.remove('on');
-        $('#heard').textContent = err === 'not-allowed' ? 'لازم تسمحي للمايك من المتصفح 🎤' : 'ما زبط، جرّبي كمان مرة أو اكتبي 👇';
+        $('#heard').textContent = voiceError(err);
       },
     });
   });
 
-  // Magic scene from the teacher's words (only the description is sent, never names or photos).
+  // ---------- New scene from the teacher's words: 4 pictures to choose from ----------
+  // Only the description is sent to the free picture service, never names or photos.
   $('#magicBtn').addEventListener('click', () => {
-    let desc = ($('#story').value || '').trim();
-    students.forEach(st => { desc = desc.split(st.name).join(''); });
-    desc = desc.replace(/\s+/g, ' ').trim();
-    if (!desc) { toast('احكي أو اكتبي وصف المشهد أول، مثلاً: حديقة فيها فراشات وقوس قزح'); $('#story').focus(); return; }
-    const prompt = `cute flat children's book illustration background, bright soft pastel colors, no people, no text, empty space in the center, scene: ${desc}`;
-    const seed = Math.floor(Math.random() * 1e6);
-    state.magic = { url: `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1080&height=1080&nologo=true&seed=${seed}` };
-    syncUI(); draw();
-    toast('عم نرسم مشهد جديد من وصفك... 🪄 (ممكن ياخد ثواني)', 4000);
+    $('#magicBox').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => $('#magicText').focus(), 400);
   });
+  $('#magicIdeas').addEventListener('click', e => {
+    const b = e.target.closest('[data-idea]');
+    if (!b) return;
+    $('#magicText').value = b.dataset.idea;
+    makeMagic();
+  });
+  $('#magicGo').addEventListener('click', () => makeMagic());
+  $('#magicText').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); makeMagic(); } });
+
+  let magicRec = null;
+  $('#magicMic').addEventListener('click', () => {
+    if (!voiceSupported) { toast(voiceError('unsupported'), 5000); $('#magicText').focus(); return; }
+    if (magicRec) { magicRec.stop(); return; }
+    $('#magicMic').classList.add('on');
+    $('#magicNote').textContent = 'عم بسمعك... احكي المشهد 👂';
+    magicRec = listen({
+      onText: t => { $('#magicText').value = t; },
+      onEnd: t => {
+        magicRec = null; $('#magicMic').classList.remove('on');
+        if (t) { $('#magicText').value = t; makeMagic(); }
+        else $('#magicNote').textContent = voiceError('no-speech');
+      },
+      onError: err => { magicRec = null; $('#magicMic').classList.remove('on'); $('#magicNote').textContent = voiceError(err); },
+    });
+  });
+
+  let magicRun = 0;
+  // Find a free ready-made scene from the teacher's words (letters, olive picking, Ramadan ...).
+  function makeMagic() {
+    let desc = ($('#magicText').value || '').trim();
+    if (!desc) { $('#magicNote').textContent = 'اكتبي أو احكي شو بدك بالمشهد، أو اختاري فكرة من فوق 👆'; $('#magicText').focus(); return; }
+    students.forEach(st => { desc = desc.split(st.name).join(''); });
+    magicRun++;
+    $('#magicGrid').innerHTML = '';
+    const letter = findLetter(desc);
+    if (letter) {
+      state.letter = letter[1];
+      setScene('letter', true);
+      $('#magicNote').textContent = `✨ لقيتلك: حرف ${letter[0]} (${letter[1]}). فيكِ تغيّري الحرف من تحت 👇`;
+    } else {
+      const sc = matchScene(desc);
+      if (!sc) {
+        $('#magicNote').textContent = 'ما عندي هالمشهد لسّا 😊 صوّري خلفية من عندك أو اختاري من الصور 👇';
+        return;
+      }
+      setScene(sc.id, true);
+      $('#magicNote').textContent = `✨ لقيتلك: ${sc.emoji} ${sc.name}`;
+    }
+    saved = null; $('#batchPanel').classList.add('hidden');
+    syncUI(); draw();
+    document.querySelector(`#sceneStrip [data-scene="${state.sceneId}"]`)?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  }
+  function pick(b) {
+    state.magic = { url: b.dataset.pick, letter: b.dataset.letter || null };
+    saved = null; $('#batchPanel').classList.add('hidden');
+    syncUI(); draw();
+  }
+  $('#magicGrid').addEventListener('click', e => {
+    const b = e.target.closest('[data-pick]');
+    if (b) pick(b);
+  });
+  $('#letterStrip').addEventListener('click', e => {
+    const b = e.target.closest('[data-letter]');
+    if (!b) return;
+    state.letter = b.dataset.letter;
+    saved = null;
+    syncUI(); draw();
+  });
+
+  // ---------- Teacher's own background: take a photo or pick from the gallery ----------
+  // The photo stays on the device; it is only drawn into the picture.
+  async function onBgFile(e) {
+    const f = e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    try {
+      const blob = await shrink(f, 1400);
+      const url = blobURL('bg-own', blob);
+      state.magic = { url, letter: null, local: true };
+      magicRun++;
+      $('#magicGrid').innerHTML = `<button class="magic-opt" data-pick="${url}" aria-pressed="true"><img src="${url}" alt=""></button>`;
+      $('#magicNote').textContent = 'حطّينا صورتك خلفية ✨';
+      saved = null; $('#batchPanel').classList.add('hidden');
+      syncUI(); draw();
+    } catch {
+      toast('ما قدرنا نفتح الصورة، جرّبي صورة تانية');
+    }
+  }
+  $('#bgCam').addEventListener('change', onBgFile);
+  $('#bgGal').addEventListener('change', onBgFile);
 
   // Sending
   async function finalImage() {

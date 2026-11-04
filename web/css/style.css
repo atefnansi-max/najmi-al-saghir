@@ -288,3 +288,19 @@ textarea.input { min-height: 90px; resize: vertical; line-height: 1.5; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- New scene maker ---------- */
+.magic-box { background: var(--purple-soft); border-radius: 18px; padding: 14px; }
+.magic-box .input { min-height: 48px; font-size: 16px; }
+.magic-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.magic-grid:empty { display: none; }
+.magic-opt {
+  aspect-ratio: 1; border-radius: 16px; border: 3px solid transparent; padding: 0; overflow: hidden;
+  background: #fff; display: flex; align-items: center; justify-content: center;
+}
+.magic-opt img { width: 100%; height: 100%; object-fit: cover; }
+.magic-opt[aria-pressed="true"] { border-color: var(--purple); box-shadow: 0 0 0 4px #fff; }
+.magic-opt .spin { font-size: 34px; animation: wobble 1s ease-in-out infinite; }
+@keyframes wobble { 0%, 100% { transform: rotate(-12deg); } 50% { transform: rotate(12deg); } }
+.btn.on { background: var(--coral); color: #fff; }
+.magic-box .btn:not(.primary), .magic-box .chip { background: #fff; box-shadow: 0 2px 0 #D9D3FF; }
