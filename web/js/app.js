@@ -365,7 +365,7 @@ async function make(preId) {
     if (!force && $('#phrase').dataset.edited === '1') return;
     const names = ks.map(k => k.name).join(' و');
     const girl = ks.length === 1 ? isGirl(ks[0]) : ks.every(isGirl);
-    const list = phrasesFor(state.behavior || 'general', names, girl);
+    const list = phrasesFor(state.behavior || 'general', names, girl, ks.length > 1);
     state.phrase = list[state.phraseIdx % list.length];
     $('#phrase').value = state.phrase;
     $('#phrase').dataset.edited = '0';
@@ -395,6 +395,7 @@ async function make(preId) {
       await compose(cv, {
         bgURL: state.magic ? state.magic.url : sceneURL(scene),
         bgCors: !!state.magic,
+        decorate: state.magic ? null : scene.decorate,
         stickers: ks.map(k => k.sticker).filter(Boolean),
         acc: ks.length ? state.acc : 'none',
         phrase: ks.length ? $('#phrase').value.trim() : 'اختاري الطفل لنبلّش ⭐',
@@ -541,7 +542,7 @@ async function make(preId) {
   $('#wa').addEventListener('click', async () => {
     const r = await ensure(); if (!r) return;
     const k = r.ks[0];
-    const msg = parentMessage({ name: r.ks.map(x => x.name).join(' و'), isGirl: r.ks.length === 1 && isGirl(k), story: state.story && state.story.length < 160 ? state.story : '', settings: cfg });
+    const msg = parentMessage({ name: k.name, isGirl: isGirl(k), story: state.story && state.story.length < 160 ? state.story : '', settings: cfg });
     const file = new File([r.blob], `najmi-${Date.now()}.jpg`, { type: 'image/jpeg' });
     if (canShareFiles(file)) {
       const ok = await shareImage(file, msg);
