@@ -315,73 +315,158 @@ const SCENES = [
   },
 ];
 
-// Exam paper: the child stands on a perfect test sheet, with a red "ممتاز" stamp.
+// ---------- Exam scenes ----------
+// Inspired by real kindergarten worksheets: hexagon letter boxes, a coloured hand,
+// a duck, "match the letter" words, red hand-drawn stars and glitter stickers.
+
 const check = (x, y, s = 1) =>
   `<path d="M${x - 22 * s} ${y} l${14 * s} ${16 * s} l${30 * s} ${-34 * s}" stroke="#2EC4A0" stroke-width="${10 * s}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
-const qbox = (x, y, inner) =>
-  `<g transform="translate(${x} ${y})"><rect x="-46" y="-40" width="92" height="80" rx="16" fill="#fff" stroke="#C9C4FF" stroke-width="4" stroke-dasharray="10 7"/>${inner}</g>`;
 const crayon = (x, y, rot, c) =>
   `<g transform="translate(${x} ${y}) rotate(${rot})"><rect x="-70" y="-15" width="130" height="30" rx="8" fill="${c}"/>
    <path d="M60 -15 l34 15 l-34 15z" fill="${c}"/><rect x="-40" y="-15" width="16" height="30" fill="#fff" opacity=".45"/><rect x="20" y="-15" width="10" height="30" fill="#000" opacity=".12"/></g>`;
+const hexBox = (x, y) =>
+  `<path transform="translate(${x} ${y})" d="M-64 0 L-38 -34 H38 L64 0 L38 34 H-38Z" fill="#fff" stroke="#2E2A4F" stroke-width="4" stroke-linejoin="round"/>`;
+// Red teacher star, drawn by hand (slightly wobbly outline).
+function redStar(x, y, r, rot = 0) {
+  let d = '';
+  for (let i = 0; i <= 5; i++) {
+    const a = -Math.PI / 2 + (i * 4 * Math.PI) / 5;
+    d += `${i ? 'L' : 'M'}${(r * Math.cos(a)).toFixed(1)} ${(r * Math.sin(a)).toFixed(1)}`;
+  }
+  return `<path transform="translate(${x} ${y}) rotate(${rot})" d="${d}" fill="none" stroke="#E0464B" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>`;
+}
+// Glitter star sticker like the ones teachers stick on papers.
+function glitterStar(x, y, r, c, rot = 0) {
+  const rr = rand(Math.round(x * 7 + y));
+  let dots = '';
+  for (let i = 0; i < 14; i++) {
+    const a = rr() * Math.PI * 2, d = rr() * r * 0.55;
+    dots += `<circle cx="${(Math.cos(a) * d).toFixed(1)}" cy="${(Math.sin(a) * d).toFixed(1)}" r="${(2 + rr() * 3).toFixed(1)}" fill="#fff" opacity=".85"/>`;
+  }
+  return `<g transform="translate(${x} ${y}) rotate(${rot})">${star5(0, 0, r + 6, '#fff')}${star5(0, 0, r, c)}${dots}</g>`;
+}
+const duck = (x, y, s = 1) => `<g transform="translate(${x} ${y}) scale(${s})">
+  <path d="M-70 40 q20 18 40 0 q20 18 40 0 q20 18 40 0 q20 18 40 0" stroke="#4DB6FF" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <ellipse cx="0" cy="10" rx="58" ry="34" fill="#FFD84D" stroke="#2E2A4F" stroke-width="4"/>
+  <path d="M-10 4 q24 -6 34 14 q-24 8 -34 -14z" fill="#FFC21A" stroke="#2E2A4F" stroke-width="3"/>
+  <circle cx="-42" cy="-30" r="28" fill="#FFD84D" stroke="#2E2A4F" stroke-width="4"/>
+  <path d="M-70 -28 l-22 6 l22 6z" fill="#FF9E2C" stroke="#2E2A4F" stroke-width="3" stroke-linejoin="round"/>
+  <circle cx="-50" cy="-36" r="5" fill="#2E2A4F"/></g>`;
+const hand = (x, y, s = 1, fill = '#FFE066') => `<g transform="translate(${x} ${y}) scale(${s})" fill="${fill}" stroke="#2E2A4F" stroke-width="4" stroke-linejoin="round">
+  ${[-30, -12, 6, 24].map((fx, i) => `<rect x="${fx - 9}" y="${-70 + [10, 0, 4, 16][i]}" width="18" height="70" rx="9"/>`).join('')}
+  <rect x="34" y="-10" width="18" height="56" rx="9" transform="rotate(38 43 18)"/>
+  <rect x="-40" y="-14" width="76" height="70" rx="26"/></g>`;
+const labelSticker = (x, y, rot, bg, edge) =>
+  `<g transform="translate(${x} ${y}) rotate(${rot})"><rect x="-92" y="-40" width="184" height="80" rx="18" fill="${edge}"/><rect x="-84" y="-32" width="168" height="64" rx="14" fill="${bg}"/>
+   ${star5(-70, -26, 12, '#FF7A6B')}${star5(72, 24, 10, '#6C5CE7')}</g>`;
+
+function stamp(ctx, x, y, rot = -12) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot * Math.PI / 180);
+  ctx.globalAlpha = 0.93;
+  ctx.fillStyle = '#FFF5F4';
+  ctx.strokeStyle = '#E0464B';
+  ctx.lineWidth = 9;
+  ctx.beginPath(); ctx.arc(0, 0, 112, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.lineWidth = 3; ctx.setLineDash([6, 8]);
+  ctx.beginPath(); ctx.arc(0, 0, 92, 0, Math.PI * 2); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#E0464B';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.direction = 'rtl';
+  ctx.font = '700 50px "Baloo Bhaijaan 2", "Tajawal", sans-serif';
+  ctx.fillText('ممتاز', 0, -20);
+  ctx.font = '700 40px sans-serif';
+  ctx.fillText('★ ★ ★', 0, 34);
+  ctx.restore();
+}
+
+function text(ctx, str, x, y, size, color, weight = 700, rot = 0) {
+  ctx.save();
+  ctx.translate(x, y); ctx.rotate(rot);
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.direction = 'rtl';
+  ctx.font = `${weight} ${size}px "Baloo Bhaijaan 2", "Tajawal", sans-serif`;
+  ctx.fillText(str, 0, 0);
+  ctx.restore();
+}
+
+const PAPER_ROT = -3;
 
 SCENES.push({
-  id: 'exam', name: 'ورقة الامتحان', emoji: '📝', acc: 'medal',
-  words: ['امتحان', 'امتحانات', 'اختبار', 'ورقة', 'علامة', 'علامه كاملة', 'كاملة', 'ممتاز', 'عشرة على عشرة', 'تقييم'],
+  id: 'exam', name: 'ورقة الامتحان', emoji: '📝', acc: 'paper',
+  words: ['ورقة', 'ورقه', 'ورقة امتحان', 'علامة كاملة', 'كاملة', 'عشرة على عشرة', 'تقييم', 'حروف', 'حرف'],
   svg: () => `
-    <rect width="1080" height="1080" fill="#FFE8A3"/>
-    ${stars(70, '#FFD66B', 41, 1080, 9)}
-    <g transform="rotate(-3 540 560)">
-      <rect x="96" y="86" width="900" height="980" rx="26" fill="#2E2A4F" opacity=".12"/>
-      <rect x="80" y="70" width="900" height="980" rx="26" fill="#FFFFFF"/>
-      ${Array.from({ length: 14 }, (_, i) => `<line x1="110" y1="${250 + i * 58}" x2="950" y2="${250 + i * 58}" stroke="#CFE6FA" stroke-width="3"/>`).join('')}
-      <line x1="880" y1="80" x2="880" y2="1040" stroke="#FFB3AB" stroke-width="4"/>
-      ${[260, 560, 860].map(y => `<circle cx="935" cy="${y}" r="20" fill="#FFE8A3"/>`).join('')}
-      <rect x="120" y="96" width="740" height="120" rx="20" fill="#F4F0FF"/>
-      <rect x="430" y="140" width="380" height="10" rx="5" fill="#C9C4FF"/>
-      <rect x="560" y="175" width="250" height="10" rx="5" fill="#C9C4FF"/>
-      ${qbox(800, 330, `<circle cx="0" cy="4" r="24" fill="#FF7A6B"/><path d="M0 -20 q4 -14 16 -16 q-4 12 -16 16" fill="#2EC4A0"/>`)}
-      ${check(735, 330, .9)}
-      ${qbox(800, 450, `<circle cx="0" cy="0" r="18" fill="#FFC83D"/>${[0, 45, 90, 135, 180, 225, 270, 315].map(a => `<line x1="0" y1="0" x2="${(30 * Math.cos(a * Math.PI / 180)).toFixed(1)}" y2="${(30 * Math.sin(a * Math.PI / 180)).toFixed(1)}" stroke="#FFC83D" stroke-width="5" stroke-linecap="round"/>`).join('')}<circle cx="0" cy="0" r="18" fill="#FFC83D"/>`)}
-      ${check(735, 450, .9)}
-      ${qbox(800, 570, `${[0, 72, 144, 216, 288].map(a => `<circle cx="${(16 * Math.cos(a * Math.PI / 180)).toFixed(1)}" cy="${(16 * Math.sin(a * Math.PI / 180)).toFixed(1)}" r="12" fill="#FF9EC7"/>`).join('')}<circle r="9" fill="#FFC83D"/>`)}
-      ${check(735, 570, .9)}
-      ${qbox(200, 450, `<path d="M-24 14 h48 M-24 -2 h30 M-24 -18 h40" stroke="#4DB6FF" stroke-width="8" stroke-linecap="round"/>`)}
-      ${check(270, 450, .9)}
-      ${qbox(200, 570, `${[-18, 0, 18].map(x => `<circle cx="${x}" cy="0" r="8" fill="#6C5CE7"/>`).join('')}`)}
-      ${check(270, 570, .9)}
-      ${qbox(200, 690, `<path d="M0 -24 l7 15 l16 2 l-12 11 l3 16 l-14 -8 l-14 8 l3 -16 l-12 -11 l16 -2z" fill="#FFC83D"/>`)}
-      ${check(270, 690, .9)}
-      ${qbox(800, 690, `<path d="M-20 18 q20 -50 40 0" stroke="#FF7A6B" stroke-width="8" fill="none" stroke-linecap="round"/><circle cx="-10" cy="-10" r="5" fill="#2E2A4F"/><circle cx="10" cy="-10" r="5" fill="#2E2A4F"/>`)}
-      ${check(735, 690, .9)}
+    <rect width="1080" height="1080" fill="#FF6B4A"/>
+    <rect x="0" y="0" width="1080" height="1080" fill="#FF7A5C"/>
+    <rect x="0" y="0" width="420" height="1080" fill="#FF6B4A"/>
+    <g transform="rotate(9 540 560)" opacity=".9">
+      <rect x="40" y="150" width="760" height="900" rx="10" fill="#F6F3EC"/>
     </g>
-    <g transform="translate(250 170) rotate(-12)" opacity=".92">
-      <circle r="112" fill="#FFF5F4" stroke="#E0464B" stroke-width="9"/>
-      <circle r="92" fill="none" stroke="#E0464B" stroke-width="3" stroke-dasharray="6 8"/>
-      ${star5(0, 62, 18, '#E0464B')}${star5(-40, 56, 10, '#E0464B')}${star5(40, 56, 10, '#E0464B')}
+    <g transform="rotate(${PAPER_ROT} 540 560)">
+      <rect x="96" y="86" width="900" height="980" rx="14" fill="#2E2A4F" opacity=".14"/>
+      <rect x="80" y="70" width="900" height="980" rx="14" fill="#FFFFFF"/>
+      <rect x="110" y="96" width="840" height="130" rx="10" fill="none" stroke="#2E2A4F" stroke-width="3"/>
+      <line x1="110" y1="140" x2="950" y2="140" stroke="#2E2A4F" stroke-width="2"/>
+      <line x1="560" y1="96" x2="560" y2="226" stroke="#2E2A4F" stroke-width="2"/>
+      <rect x="600" y="160" width="300" height="5" rx="2" fill="#B9B4D6"/><rect x="600" y="198" width="220" height="5" rx="2" fill="#B9B4D6"/>
+      <path d="M620 186 q20 -18 40 0 t40 0 t40 0" stroke="#6C5CE7" stroke-width="5" fill="none" stroke-linecap="round"/>
+      ${hand(870, 330, 0.9)}
+      ${hexBox(700, 300)}${hexBox(540, 300)}${hexBox(380, 300)}
+      ${duck(200, 310, 0.9)}
+      <line x1="110" y1="400" x2="950" y2="400" stroke="#2E2A4F" stroke-width="2" stroke-dasharray="2 8" opacity=".5"/>
+      <path d="M800 470 C 700 480, 320 520, 250 600" stroke="#9A93C9" stroke-width="5" fill="none" stroke-linecap="round" opacity=".5"/>
+      <path d="M800 560 C 700 560, 320 470, 250 480" stroke="#9A93C9" stroke-width="5" fill="none" stroke-linecap="round" opacity=".5"/>
+      <path d="M800 650 C 700 650, 320 720, 250 720" stroke="#9A93C9" stroke-width="5" fill="none" stroke-linecap="round" opacity=".5"/>
+      ${check(930, 470, .8)}${check(930, 560, .8)}${check(930, 650, .8)}
+      ${redStar(860, 790, 50, 8)}${redStar(180, 840, 38, -10)}
     </g>
-    <g transform="translate(150 830) rotate(-28)">
+    ${glitterStar(140, 420, 50, '#8E5BE8', -12)}
+    ${glitterStar(960, 560, 42, '#E8384F', 14)}
+    ${glitterStar(110, 660, 36, '#2EC48A', 6)}
+    ${glitterStar(965, 400, 40, '#FFC83D', 10)}
+    <g transform="translate(160 960) rotate(-20)">
       <rect x="-20" y="-17" width="260" height="34" rx="6" fill="#FFC83D"/>
       <rect x="-20" y="-17" width="260" height="11" fill="#FFB020"/>
       <path d="M240 -17 l50 17 l-50 17z" fill="#F7D9A8"/><path d="M276 -5 l14 5 l-14 5z" fill="#2E2A4F"/>
       <rect x="-56" y="-17" width="40" height="34" rx="8" fill="#FF9EC7"/><rect x="-22" y="-17" width="10" height="34" fill="#C9C4FF"/>
     </g>
-    ${crayon(860, 790, -18, '#FF7A6B')}${crayon(900, 840, -6, '#4DB6FF')}${crayon(830, 870, 10, '#2EC4A0')}
-    <g transform="translate(900 300) rotate(12)">${star5(0, 0, 54, '#FFC83D')}<circle r="18" fill="#FFE8A3"/></g>
-    <g transform="translate(530 60) rotate(4)"><rect x="-20" y="-6" width="40" height="80" rx="20" fill="none" stroke="#A9A3E8" stroke-width="7"/><rect x="-10" y="6" width="20" height="56" rx="10" fill="none" stroke="#A9A3E8" stroke-width="6"/></g>`,
-  // Canvas-drawn words so the Arabic font is always right.
+    ${crayon(880, 830, -18, '#6C5CE7')}${crayon(920, 880, -6, '#4DB6FF')}${crayon(850, 920, 10, '#2EC4A0')}`,
   decorate(ctx) {
+    // Words on the paper follow the paper's tilt.
     ctx.save();
-    ctx.translate(250, 170);
-    ctx.rotate(-12 * Math.PI / 180);
-    ctx.fillStyle = '#E0464B';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.direction = 'rtl';
-    ctx.font = '700 50px "Baloo Bhaijaan 2", "Tajawal", sans-serif';
-    ctx.fillText('ممتاز', 0, -26);
-    ctx.font = '700 38px "Baloo Bhaijaan 2", "Tajawal", sans-serif';
-    ctx.fillText('١٠/١٠', 0, 22);
+    ctx.translate(540, 560); ctx.rotate(PAPER_ROT * Math.PI / 180); ctx.translate(-540, -560);
+    text(ctx, 'الاسم: نجم الصف', 760, 118, 26, '#2E2A4F', 500);
+    text(ctx, 'يـ', 700, 302, 44, '#5B5B7A');
+    text(ctx, 'ـيـ', 540, 302, 44, '#5B5B7A');
+    text(ctx, 'ـي', 380, 302, 44, '#5B5B7A');
+    ['يا', 'وا', 'وو'].forEach((w, i) => text(ctx, w, 850, 472 + i * 90, 40, '#2E2A4F'));
+    ['واحد', 'ياسر', 'يوم'].forEach((w, i) => text(ctx, w, 200, 478 + i * 120, 34, '#2E2A4F'));
     ctx.restore();
+    stamp(ctx, 250, 190);
+  },
+});
+
+SCENES.push({
+  id: 'examphoto', name: 'امتحانات صفّي', emoji: '📸', acc: 'paper',
+  words: ['امتحان', 'امتحانات', 'اختبار', 'علامة', 'علامه', 'اوراق', 'أوراق', 'صفي', 'نتيجة', 'نتايج'],
+  photo: 'scenes/exam-photo.jpg',
+  svg: () => `
+    <defs>
+      <radialGradient id="glow" cx="50%" cy="58%" r="45%"><stop offset="0" stop-color="#FFF8EC" stop-opacity=".85"/><stop offset=".6" stop-color="#FFF8EC" stop-opacity=".35"/><stop offset="1" stop-color="#FFF8EC" stop-opacity="0"/></radialGradient>
+      <radialGradient id="vig" cx="50%" cy="50%" r="75%"><stop offset=".6" stop-color="#FF6B4A" stop-opacity="0"/><stop offset="1" stop-color="#C73E1D" stop-opacity=".45"/></radialGradient>
+    </defs>
+    <rect width="1080" height="1080" fill="url(#vig)"/>
+    <ellipse cx="540" cy="620" rx="440" ry="420" fill="url(#glow)"/>
+    ${glitterStar(120, 440, 46, '#8E5BE8', -12)}
+    ${glitterStar(960, 470, 40, '#E8384F', 14)}
+    ${glitterStar(90, 700, 34, '#2EC48A', 6)}
+    ${glitterStar(990, 720, 30, '#FFC83D', -8)}
+    ${labelSticker(880, 200, 10, '#FFE066', '#FF9EC7')}
+    ${[[330, 110, 10], [760, 330, 8], [300, 360, 7], [700, 130, 9]].map(([x, y, r]) => star5(x, y, r, '#fff')).join('')}`,
+  decorate(ctx) {
+    text(ctx, 'أبطال الامتحان', 880, 202, 34, '#B0306A', 700, 10 * Math.PI / 180);
+    stamp(ctx, 220, 200);
   },
 });
 
@@ -392,6 +477,7 @@ export const ACCESSORIES = [
   { id: 'stars', emoji: '✨', name: 'نجوم' },
   { id: 'medal', emoji: '🏅', name: 'وسام' },
   { id: 'heart', emoji: '💛', name: 'قلوب' },
+  { id: 'paper', emoji: '📄', name: 'ماسك ورقته' },
 ];
 
 export function getScenes() { return SCENES; }
@@ -402,7 +488,18 @@ export function sceneSVG(scene) {
 }
 
 const cache = new Map();
+// Photo scenes: the photo is the background, and the SVG is drawn on top of it.
+export function sceneOverlayURL(scene) {
+  if (!scene.photo) return null;
+  const key = scene.id + ':overlay';
+  if (!cache.has(key)) {
+    const blob = new Blob([sceneSVG(scene)], { type: 'image/svg+xml' });
+    cache.set(key, URL.createObjectURL(blob));
+  }
+  return cache.get(key);
+}
 export function sceneURL(scene) {
+  if (scene.photo) return scene.photo;
   if (!cache.has(scene.id)) {
     const blob = new Blob([sceneSVG(scene)], { type: 'image/svg+xml' });
     cache.set(scene.id, URL.createObjectURL(blob));
