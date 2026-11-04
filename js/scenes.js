@@ -228,7 +228,7 @@ const SCENES = [
   },
   {
     id: 'desert', name: 'الصحراء', emoji: '🐪', acc: 'medal',
-    words: ['صحراء', 'الصحراء', 'جمل', 'خيمة', 'رمل', 'بادية', 'وادي رم', 'رم'],
+    words: ['صحراء', 'الصحراء', 'جمل', 'خيمة', 'رمل', 'بادية', 'وادي رم'],
     svg: () => `
       <rect width="1080" height="1080" fill="#FFB86B"/>
       <rect width="1080" height="320" fill="#FF9E6B"/>
@@ -467,6 +467,85 @@ SCENES.push({
   decorate(ctx) {
     text(ctx, 'أبطال الامتحان', 880, 202, 34, '#B0306A', 700, 10 * Math.PI / 180);
     stamp(ctx, 220, 200);
+  },
+});
+
+// Olive picking: olive trees, a ladder, baskets and the cloth spread under the trees.
+function oliveTree(x, y, s, flip = false) {
+  const r = rand(Math.round(x + y));
+  let olives = '';
+  for (let i = 0; i < 26; i++) {
+    const a = r() * Math.PI * 2, d = 40 + r() * 120;
+    const ox = Math.cos(a) * d * 1.3, oy = -150 + Math.sin(a) * d * 0.7;
+    olives += `<ellipse cx="${ox.toFixed(0)}" cy="${oy.toFixed(0)}" rx="9" ry="12" fill="${r() > 0.5 ? '#4B3B6B' : '#7FA03A'}" transform="rotate(${(r() * 60 - 30).toFixed(0)} ${ox.toFixed(0)} ${oy.toFixed(0)})"/>`;
+  }
+  return `<g transform="translate(${x} ${y}) scale(${flip ? -s : s} ${s})">
+    <path d="M-30 120 C -20 40, -60 -10, -10 -80 C 10 -40, 30 -10, 30 120 Z" fill="#8A6A4A"/>
+    <path d="M-12 -60 C -60 -90, -90 -70, -110 -110 M 10 -70 C 40 -110, 80 -110, 110 -140" stroke="#8A6A4A" stroke-width="16" fill="none" stroke-linecap="round"/>
+    <ellipse cx="-80" cy="-150" rx="120" ry="80" fill="#8DB07A"/>
+    <ellipse cx="60" cy="-170" rx="130" ry="85" fill="#9BBF86"/>
+    <ellipse cx="0" cy="-230" rx="120" ry="70" fill="#A9C994"/>
+    <ellipse cx="-20" cy="-120" rx="90" ry="50" fill="#7FA36C"/>
+    ${olives}
+  </g>`;
+}
+const basket = (x, y, s = 1) => `<g transform="translate(${x} ${y}) scale(${s})">
+  <path d="M-70 -20 h140 l-16 70 h-108z" fill="#D9A45B"/>
+  <path d="M-62 0 h124 M-58 20 h116 M-54 38 h108" stroke="#B98245" stroke-width="5"/>
+  <path d="M-55 -20 q55 -70 110 0" stroke="#B98245" stroke-width="9" fill="none"/>
+  ${[-40, -20, 0, 20, 40, -30, -10, 10, 30].map((ox, i) => `<ellipse cx="${ox}" cy="${i < 5 ? -24 : -38}" rx="11" ry="14" fill="${i % 3 ? '#4B3B6B' : '#7FA03A'}"/>`).join('')}
+</g>`;
+
+SCENES.push({
+  id: 'olive', name: 'قطف الزيتون', emoji: '🫒', acc: 'heart',
+  words: ['زيتون', 'الزيتون', 'قطف', 'موسم الزيتون', 'زيت', 'معصرة'],
+  svg: () => `
+    <rect width="1080" height="1080" fill="#D8EEFB"/>
+    <circle cx="880" cy="150" r="80" fill="#FFD66B"/>
+    ${cloud(120, 140, .8)}${cloud(520, 90, .6)}
+    <path d="M0 560 Q200 440 420 520 T820 480 T1080 520 V1080 H0z" fill="#B9D88F"/>
+    <path d="M0 640 Q300 560 600 620 T1080 600 V1080 H0z" fill="#A3C97A"/>
+    ${oliveTree(170, 600, 1.05)}
+    ${oliveTree(920, 610, 1.1, true)}
+    <g transform="translate(830 330) rotate(18)">
+      <rect x="-50" y="0" width="14" height="430" rx="6" fill="#C98E4B"/><rect x="36" y="0" width="14" height="430" rx="6" fill="#C98E4B"/>
+      ${[40, 110, 180, 250, 320, 390].map(y => `<rect x="-40" y="${y}" width="80" height="12" rx="5" fill="#B07A3A"/>`).join('')}
+    </g>
+    <path d="M-20 820 L400 760 L680 790 L1100 750 L1100 900 L-20 940z" fill="#FFF8EC"/>
+    <path d="M-20 820 L400 760 L680 790 L1100 750" stroke="#FF7A6B" stroke-width="10" fill="none" stroke-dasharray="40 20"/>
+    ${Array.from({ length: 30 }, (_, i) => { const r = rand(i + 99); const x = (r() * 1080).toFixed(0), y = (800 + r() * 110).toFixed(0); return `<ellipse cx="${x}" cy="${y}" rx="9" ry="12" fill="${r() > 0.5 ? '#4B3B6B' : '#7FA03A'}"/>`; }).join('')}
+    ${basket(140, 860, 1.1)}${basket(950, 870, 1)}
+    <path d="M0 960 Q540 920 1080 960 V1080 H0z" fill="#8FBF5E"/>`,
+});
+
+// Letter of the week: a chalkboard with a big letter (the letter is drawn on the canvas).
+SCENES.push({
+  id: 'letter', name: 'حرف الأسبوع', emoji: '🔤', acc: 'medal',
+  words: ['حرف الاسبوع'],
+  svg: () => `
+    <rect width="1080" height="1080" fill="#FFF0C9"/>
+    ${bunting(30, ['#FF7A6B', '#4DB6FF', '#FFC83D', '#2EC4A0', '#FF9EC7'])}
+    <rect x="120" y="120" width="840" height="560" rx="24" fill="#9A6B3E"/>
+    <rect x="150" y="150" width="780" height="500" rx="12" fill="#2F6B55"/>
+    <path d="M190 600 q60 -20 120 0" stroke="#fff" stroke-width="4" fill="none" opacity=".25"/>
+    <rect x="300" y="676" width="480" height="22" rx="8" fill="#B98552"/>
+    <rect x="340" y="664" width="60" height="14" rx="6" fill="#fff"/><rect x="420" y="664" width="40" height="14" rx="6" fill="#FFC83D"/><rect x="640" y="660" width="80" height="20" rx="6" fill="#FF9EC7"/>
+    ${star5(200, 200, 22, '#FFC83D')}${star5(880, 210, 18, '#fff')}${star5(860, 600, 14, '#FFC83D')}
+    <path d="M0 860 Q540 820 1080 860 V1080 H0z" fill="#FFD9E8"/>`,
+  decorate(ctx, letter = 'ب') {
+    const F = '"Baloo Bhaijaan 2", "Tajawal", sans-serif';
+    ctx.save();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.direction = 'rtl';
+    ctx.fillStyle = 'rgba(255,255,255,.95)';
+    // big letter at the top of the board, above the child's head
+    ctx.font = `700 210px ${F}`;
+    ctx.fillText(letter, 540, 235);
+    // its forms down the sides of the board
+    const forms = 'أاإآدذرزوءة'.includes(letter) ? [letter, 'ـ' + letter] : [letter + 'ـ', 'ـ' + letter + 'ـ', 'ـ' + letter];
+    ctx.font = `700 60px ${F}`;
+    ctx.fillStyle = '#FFE8A3';
+    forms.forEach((f, i) => { ctx.fillText(f, 860, 340 + i * 105); ctx.fillText(f, 220, 340 + i * 105); });
+    ctx.restore();
   },
 });
 
