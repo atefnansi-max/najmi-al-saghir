@@ -1,0 +1,14 @@
+{
+  "name": "نجمي الصغير",
+  "short_name": "نجمي",
+  "description": "نجوم وتشجيع لأطفال الروضة",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#FFF8EC",
+  "theme_color": "#6C5CE7",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
