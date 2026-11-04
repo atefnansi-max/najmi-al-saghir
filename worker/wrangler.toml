@@ -1,0 +1,6 @@
+name = "najmi-draw"
+main = "src/index.js"
+compatibility_date = "2025-06-01"
+
+[ai]
+binding = "AI"

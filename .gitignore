@@ -4,3 +4,5 @@ node_modules/
 Thumbs.db
 najmi-demo.mp4
 paper.png
+worker/node_modules/
+worker/.wrangler/
