@@ -35,6 +35,7 @@ export async function compose(canvas, o) {
   const bg = await loadURL(o.bgURL, o.bgCors);
   const s = Math.max(S / bg.width, S / bg.height);
   ctx.drawImage(bg, (S - bg.width * s) / 2, (S - bg.height * s) / 2, bg.width * s, bg.height * s);
+  if (o.decorate) o.decorate(ctx);
 
   const imgs = await Promise.all((o.stickers || []).map(blobToImage));
   const n = imgs.length;

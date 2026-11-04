@@ -301,7 +301,7 @@ const SCENES = [
   },
   {
     id: 'grad', name: 'التخرّج', emoji: '🎓', acc: 'cap',
-    words: ['تخرج', 'تخرّج', 'التخرج', 'حفلة', 'شهادة', 'آخر السنة', 'نهاية السنة', 'امتحان', 'امتحانات'],
+    words: ['تخرج', 'تخرّج', 'التخرج', 'حفلة', 'شهادة', 'آخر السنة', 'نهاية السنة'],
     svg: () => `
       <rect width="1080" height="1080" fill="#3B2F9E"/>
       <path d="M0 0 h1080 v120 q-90 50 -180 0 q-90 50 -180 0 q-90 50 -180 0 q-90 50 -180 0 q-90 50 -180 0 q-90 50 -180 0z" fill="#6C5CE7"/>
@@ -314,6 +314,76 @@ const SCENES = [
       <rect y="860" width="1080" height="220" fill="#9A6B3E"/><rect y="860" width="1080" height="26" fill="#B98552"/>`,
   },
 ];
+
+// Exam paper: the child stands on a perfect test sheet, with a red "ممتاز" stamp.
+const check = (x, y, s = 1) =>
+  `<path d="M${x - 22 * s} ${y} l${14 * s} ${16 * s} l${30 * s} ${-34 * s}" stroke="#2EC4A0" stroke-width="${10 * s}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+const qbox = (x, y, inner) =>
+  `<g transform="translate(${x} ${y})"><rect x="-46" y="-40" width="92" height="80" rx="16" fill="#fff" stroke="#C9C4FF" stroke-width="4" stroke-dasharray="10 7"/>${inner}</g>`;
+const crayon = (x, y, rot, c) =>
+  `<g transform="translate(${x} ${y}) rotate(${rot})"><rect x="-70" y="-15" width="130" height="30" rx="8" fill="${c}"/>
+   <path d="M60 -15 l34 15 l-34 15z" fill="${c}"/><rect x="-40" y="-15" width="16" height="30" fill="#fff" opacity=".45"/><rect x="20" y="-15" width="10" height="30" fill="#000" opacity=".12"/></g>`;
+
+SCENES.push({
+  id: 'exam', name: 'ورقة الامتحان', emoji: '📝', acc: 'medal',
+  words: ['امتحان', 'امتحانات', 'اختبار', 'ورقة', 'علامة', 'علامه كاملة', 'كاملة', 'ممتاز', 'عشرة على عشرة', 'تقييم'],
+  svg: () => `
+    <rect width="1080" height="1080" fill="#FFE8A3"/>
+    ${stars(70, '#FFD66B', 41, 1080, 9)}
+    <g transform="rotate(-3 540 560)">
+      <rect x="96" y="86" width="900" height="980" rx="26" fill="#2E2A4F" opacity=".12"/>
+      <rect x="80" y="70" width="900" height="980" rx="26" fill="#FFFFFF"/>
+      ${Array.from({ length: 14 }, (_, i) => `<line x1="110" y1="${250 + i * 58}" x2="950" y2="${250 + i * 58}" stroke="#CFE6FA" stroke-width="3"/>`).join('')}
+      <line x1="880" y1="80" x2="880" y2="1040" stroke="#FFB3AB" stroke-width="4"/>
+      ${[260, 560, 860].map(y => `<circle cx="935" cy="${y}" r="20" fill="#FFE8A3"/>`).join('')}
+      <rect x="120" y="96" width="740" height="120" rx="20" fill="#F4F0FF"/>
+      <rect x="430" y="140" width="380" height="10" rx="5" fill="#C9C4FF"/>
+      <rect x="560" y="175" width="250" height="10" rx="5" fill="#C9C4FF"/>
+      ${qbox(800, 330, `<circle cx="0" cy="4" r="24" fill="#FF7A6B"/><path d="M0 -20 q4 -14 16 -16 q-4 12 -16 16" fill="#2EC4A0"/>`)}
+      ${check(735, 330, .9)}
+      ${qbox(800, 450, `<circle cx="0" cy="0" r="18" fill="#FFC83D"/>${[0, 45, 90, 135, 180, 225, 270, 315].map(a => `<line x1="0" y1="0" x2="${(30 * Math.cos(a * Math.PI / 180)).toFixed(1)}" y2="${(30 * Math.sin(a * Math.PI / 180)).toFixed(1)}" stroke="#FFC83D" stroke-width="5" stroke-linecap="round"/>`).join('')}<circle cx="0" cy="0" r="18" fill="#FFC83D"/>`)}
+      ${check(735, 450, .9)}
+      ${qbox(800, 570, `${[0, 72, 144, 216, 288].map(a => `<circle cx="${(16 * Math.cos(a * Math.PI / 180)).toFixed(1)}" cy="${(16 * Math.sin(a * Math.PI / 180)).toFixed(1)}" r="12" fill="#FF9EC7"/>`).join('')}<circle r="9" fill="#FFC83D"/>`)}
+      ${check(735, 570, .9)}
+      ${qbox(200, 450, `<path d="M-24 14 h48 M-24 -2 h30 M-24 -18 h40" stroke="#4DB6FF" stroke-width="8" stroke-linecap="round"/>`)}
+      ${check(270, 450, .9)}
+      ${qbox(200, 570, `${[-18, 0, 18].map(x => `<circle cx="${x}" cy="0" r="8" fill="#6C5CE7"/>`).join('')}`)}
+      ${check(270, 570, .9)}
+      ${qbox(200, 690, `<path d="M0 -24 l7 15 l16 2 l-12 11 l3 16 l-14 -8 l-14 8 l3 -16 l-12 -11 l16 -2z" fill="#FFC83D"/>`)}
+      ${check(270, 690, .9)}
+      ${qbox(800, 690, `<path d="M-20 18 q20 -50 40 0" stroke="#FF7A6B" stroke-width="8" fill="none" stroke-linecap="round"/><circle cx="-10" cy="-10" r="5" fill="#2E2A4F"/><circle cx="10" cy="-10" r="5" fill="#2E2A4F"/>`)}
+      ${check(735, 690, .9)}
+    </g>
+    <g transform="translate(250 170) rotate(-12)" opacity=".92">
+      <circle r="112" fill="#FFF5F4" stroke="#E0464B" stroke-width="9"/>
+      <circle r="92" fill="none" stroke="#E0464B" stroke-width="3" stroke-dasharray="6 8"/>
+      ${star5(0, 62, 18, '#E0464B')}${star5(-40, 56, 10, '#E0464B')}${star5(40, 56, 10, '#E0464B')}
+    </g>
+    <g transform="translate(150 830) rotate(-28)">
+      <rect x="-20" y="-17" width="260" height="34" rx="6" fill="#FFC83D"/>
+      <rect x="-20" y="-17" width="260" height="11" fill="#FFB020"/>
+      <path d="M240 -17 l50 17 l-50 17z" fill="#F7D9A8"/><path d="M276 -5 l14 5 l-14 5z" fill="#2E2A4F"/>
+      <rect x="-56" y="-17" width="40" height="34" rx="8" fill="#FF9EC7"/><rect x="-22" y="-17" width="10" height="34" fill="#C9C4FF"/>
+    </g>
+    ${crayon(860, 790, -18, '#FF7A6B')}${crayon(900, 840, -6, '#4DB6FF')}${crayon(830, 870, 10, '#2EC4A0')}
+    <g transform="translate(900 300) rotate(12)">${star5(0, 0, 54, '#FFC83D')}<circle r="18" fill="#FFE8A3"/></g>
+    <g transform="translate(530 60) rotate(4)"><rect x="-20" y="-6" width="40" height="80" rx="20" fill="none" stroke="#A9A3E8" stroke-width="7"/><rect x="-10" y="6" width="20" height="56" rx="10" fill="none" stroke="#A9A3E8" stroke-width="6"/></g>`,
+  // Canvas-drawn words so the Arabic font is always right.
+  decorate(ctx) {
+    ctx.save();
+    ctx.translate(250, 170);
+    ctx.rotate(-12 * Math.PI / 180);
+    ctx.fillStyle = '#E0464B';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.direction = 'rtl';
+    ctx.font = '700 50px "Baloo Bhaijaan 2", "Tajawal", sans-serif';
+    ctx.fillText('ممتاز', 0, -26);
+    ctx.font = '700 38px "Baloo Bhaijaan 2", "Tajawal", sans-serif';
+    ctx.fillText('١٠/١٠', 0, 22);
+    ctx.restore();
+  },
+});
 
 export const ACCESSORIES = [
   { id: 'none', emoji: '🚫', name: 'بلا' },
