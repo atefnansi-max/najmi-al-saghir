@@ -1,6 +1,6 @@
 import * as db from './db.js';
 import { BEHAVIORS, phrasesFor, behaviorLabel, parentMessage } from './phrases.js';
-import { getScenes, getScene, sceneURL, matchScene, normalize, ACCESSORIES } from './scenes.js';
+import { getScenes, getScene, sceneURL, sceneOverlayURL, matchScene, normalize, ACCESSORIES } from './scenes.js';
 import { shrink, smartCutout, circleSticker } from './cutout.js';
 import { compose, fontsReady, canvasBlob } from './compose.js';
 import { listen, voiceSupported } from './voice.js';
@@ -96,9 +96,11 @@ async function home() {
   view.innerHTML = `
     <div class="hello">
       <div>
+        ${s.kg ? `<p class="muted" style="margin:0;font-weight:700">🏫 ${esc(s.kg)}</p>` : ''}
         <h1>${esc(s.className)} ${esc(s.classEmoji)}</h1>
         <p class="muted" style="margin:0">${weekTotal ? `هالأسبوع زرعتِ ${weekTotal} ${weekTotal === 1 ? 'نجمة' : 'نجوم'} بقلوب ولادك 💛` : 'يلا نبلّش أول نجمة هالأسبوع ⭐'}</p>
       </div>
+      <button class="btn small" data-go="settings" aria-label="تعديل اسم الروضة والصف">✏️ ${s.kg ? 'تعديل' : 'اسم الروضة'}</button>
     </div>
     ${waiting.length && waiting.length < students.length ? `
       <button class="nudge" style="border:0;width:100%;text-align:start" data-go="make/${esc(waiting[0].id)}">
@@ -268,7 +270,7 @@ async function settings() {
       <label class="field"><span>اسمك (بيطلع برسالة الأهل)</span><input class="input" id="t" value="${esc(s.teacher)}" placeholder="أسماء"></label>
       <label class="field"><span>اسم الصف</span><input class="input" id="c" value="${esc(s.className)}" placeholder="صف الفراشات"></label>
       <label class="field"><span>رمز الصف</span><input class="input" id="e" value="${esc(s.classEmoji)}" maxlength="4" placeholder="🦋"></label>
-      <label class="field"><span>اسم الروضة (اختياري)</span><input class="input" id="k" value="${esc(s.kg)}" placeholder="روضة الأمل"></label>
+      <label class="field"><span>اسم الروضة (بيطلع على الصور)</span><input class="input" id="k" value="${esc(s.kg)}" placeholder="روضة الأمل"></label>
       <button class="btn primary block">💾 احفظي</button>
     </form>
     <p class="note">🔒 كل الصور والأسماء محفوظة على هالجهاز بس.</p>`;
@@ -298,13 +300,18 @@ async function make(preId) {
     phraseIdx: 0,
     accTouched: false,
     sceneTouched: false,
+    noText: false,
+    mode: 'each',         // several kids: 'each' = one picture per child, 'group' = one picture for all
+    paperStyle: 'real',
   };
+  const tag = `⭐ ${cfg.kg || 'نجمي الصغير'}${cfg.className ? ' · ' + cfg.className : ''}`;
 
   view.innerHTML = `
     <div class="maker">
       <div class="preview-col">
         <div class="canvas-wrap"><canvas id="cv" width="1080" height="1080" aria-label="صورة النجمة"></canvas><div class="busy hidden" id="busy">لحظة، عم نجهّز النجمة... ⭐</div></div>
-        <div class="send-row" style="margin-top:14px">
+        <p class="note hidden" id="previewNote" style="margin-top:8px"></p>
+        <div class="send-row" style="margin-top:14px" id="singleSend">
           <button class="btn mint block" id="wa">📲 ابعتي لأهله على واتساب</button>
           <div class="two">
             <button class="btn fb" id="fb">📘 فيسبوك</button>
@@ -312,12 +319,24 @@ async function make(preId) {
           </div>
           <p class="note" id="sendNote"></p>
         </div>
+        <div class="send-row hidden" style="margin-top:14px" id="batchSend">
+          <button class="btn primary block" id="batchBtn">✨ اعملي الصور</button>
+          <p class="note">كل طفل بتطلعله صورته لحاله، بنفس القالب، وباسمه.</p>
+        </div>
+        <div class="card hidden" id="batchPanel" style="margin-top:14px"></div>
       </div>
       <div>
         <div class="card">
           <div class="step-title"><span class="num">1</span><h3>مين النجم؟</h3></div>
           <div class="strip" id="kidStrip">
             ${students.map(st => `<button class="chip-kid" data-kid="${esc(st.id)}" aria-pressed="false">${avatarHTML(st)}<span>${esc(st.name)}</span></button>`).join('')}
+          </div>
+          <div class="chips" style="margin-top:6px">
+            <button class="chip c-star" id="allKids">✅ كل الصف</button>
+          </div>
+          <div class="seg hidden" id="modeSeg" style="margin-top:12px">
+            <label><input type="radio" name="mode" value="each" checked><span>👤 صورة لكل طفل</span></label>
+            <label><input type="radio" name="mode" value="group"><span>👨‍👩‍👧‍👦 صورة وحدة للكل</span></label>
           </div>
         </div>
         <div class="card">
@@ -342,6 +361,12 @@ async function make(preId) {
           <div class="strip" id="accStrip">
             ${ACCESSORIES.map(a => `<button class="acc-btn" data-acc="${a.id}" aria-pressed="false" aria-label="${esc(a.name)}" title="${esc(a.name)}">${a.emoji}</button>`).join('')}
           </div>
+          <div class="chips hidden" id="paperStyles" style="margin-top:8px">
+            <button class="chip c-star" data-ps="real" aria-pressed="false">🧾 ورقة صفّنا</button>
+            <button class="chip c-coral" data-ps="chest" aria-pressed="false">📄 على الصدر</button>
+            <button class="chip c-sky" data-ps="big" aria-pressed="false">📃 ورقة كبيرة</button>
+            <button class="chip c-mint" data-ps="side" aria-pressed="false">↗️ على الجنب</button>
+          </div>
         </div>
         <div class="card">
           <div class="step-title"><span class="num">4</span><h3>جملة التشجيع</h3></div>
@@ -349,6 +374,7 @@ async function make(preId) {
             <textarea class="input" id="phrase" rows="2"></textarea>
             <button class="btn small" id="shuffle" aria-label="جملة تانية" title="جملة تانية">🔄</button>
           </div>
+          <label class="check" style="margin:12px 0 0;background:var(--purple-soft);color:var(--purple-ink)"><input type="checkbox" id="noText"><span>🖼️ صورة بدون كتابة</span></label>
         </div>
       </div>
     </div>`;
@@ -359,16 +385,42 @@ async function make(preId) {
 
   const picked = () => state.kids.map(id => students.find(s => s.id === id)).filter(Boolean);
 
+  const eachMode = () => state.mode === 'each' && picked().length > 1;
+
+  // The phrase for one child, in 'each' mode. If the teacher edited the text,
+  // we keep her words and only swap the first child's name for this child's name.
+  function phraseForKid(k) {
+    const first = picked()[0];
+    if ($('#phrase').dataset.edited === '1') return $('#phrase').value.trim().split(first.name).join(k.name);
+    const list = phrasesFor(state.behavior || 'general', k.name, isGirl(k));
+    return list[state.phraseIdx % list.length];
+  }
+
   function refreshPhrase(force) {
     const ks = picked();
     if (!ks.length) { state.phrase = ''; $('#phrase').value = ''; return; }
     if (!force && $('#phrase').dataset.edited === '1') return;
-    const names = ks.map(k => k.name).join(' و');
+    $('#phrase').dataset.edited = '0';
+    if (eachMode()) { state.phrase = phraseForKid(ks[0]); $('#phrase').value = state.phrase; return; }
+    // A big group gets the class name instead of a long list of names.
+    const names = ks.length > 3 ? `أبطال ${cfg.className || 'صفّنا'}` : ks.map(k => k.name).join(' و');
     const girl = ks.length === 1 ? isGirl(ks[0]) : ks.every(isGirl);
     const list = phrasesFor(state.behavior || 'general', names, girl, ks.length > 1);
     state.phrase = list[state.phraseIdx % list.length];
     $('#phrase').value = state.phrase;
-    $('#phrase').dataset.edited = '0';
+  }
+
+  function sceneOpts() {
+    const scene = getScene(state.sceneId);
+    return {
+      bgURL: state.magic ? state.magic.url : sceneURL(scene),
+      bgCors: !!state.magic,
+      overlayURL: state.magic ? null : sceneOverlayURL(scene),
+      decorate: state.magic ? null : scene.decorate,
+      acc: state.acc,
+      paperStyle: state.paperStyle,
+      tag,
+    };
   }
 
   function syncUI() {
@@ -377,7 +429,18 @@ async function make(preId) {
     $$('#sceneStrip [data-scene]').forEach(b => b.setAttribute('aria-pressed', !state.magic && b.dataset.scene === state.sceneId));
     $('#magicBtn').setAttribute('aria-pressed', !!state.magic);
     $$('#accStrip [data-acc]').forEach(b => b.setAttribute('aria-pressed', b.dataset.acc === state.acc));
+    $('#paperStyles').classList.toggle('hidden', state.acc !== 'paper');
+    $$('#paperStyles [data-ps]').forEach(b => b.setAttribute('aria-pressed', b.dataset.ps === state.paperStyle));
     const ks = picked();
+    $('#allKids').textContent = ks.length === students.length ? '↩️ إلغاء الكل' : '✅ كل الصف';
+    $('#modeSeg').classList.toggle('hidden', ks.length < 2);
+    const each = eachMode();
+    $('#singleSend').classList.toggle('hidden', each);
+    $('#batchSend').classList.toggle('hidden', !each);
+    $('#batchBtn').textContent = `✨ اعملي ${ks.length} صور، صورة لكل طفل`;
+    $('#previewNote').classList.toggle('hidden', !each);
+    if (each) $('#previewNote').textContent = `👀 هاي معاينة لـ${ks[0].name}. كل طفل رح تطلعله صورته باسمه.`;
+    if (!each) $('#batchPanel').classList.add('hidden');
     const one = ks.length === 1 ? ks[0] : null;
     $('#wa').textContent = one ? `📲 ابعتي ل${isGirl(one) ? 'أهلها' : 'أهله'} على واتساب` : '📲 ابعتي للأهل على واتساب';
     const fbOK = ks.length && ks.every(k => k.consentFb);
@@ -388,18 +451,17 @@ async function make(preId) {
   let drawToken = 0;
   async function draw() {
     const token = ++drawToken;
-    const ks = picked();
-    const scene = getScene(state.sceneId);
+    const all = picked();
+    const ks = eachMode() ? all.slice(0, 1) : all;
+    const withPic = ks.filter(k => k.sticker);
     busy.classList.remove('hidden');
     try {
       await compose(cv, {
-        bgURL: state.magic ? state.magic.url : sceneURL(scene),
-        bgCors: !!state.magic,
-        decorate: state.magic ? null : scene.decorate,
-        stickers: ks.map(k => k.sticker).filter(Boolean),
+        ...sceneOpts(),
+        stickers: withPic.map(k => k.sticker),
+        names: withPic.map(k => k.name),
         acc: ks.length ? state.acc : 'none',
-        phrase: ks.length ? $('#phrase').value.trim() : 'اختاري الطفل لنبلّش ⭐',
-        tag: `⭐ نجمي الصغير${cfg.className ? ' · ' + cfg.className : ''}`,
+        phrase: !ks.length ? 'اختاري الطفل لنبلّش ⭐' : state.noText ? '' : $('#phrase').value.trim(),
       });
     } catch (e) {
       console.warn(e);
@@ -470,6 +532,26 @@ async function make(preId) {
     state.acc = b.dataset.acc; state.accTouched = true;
     syncUI(); draw();
   });
+  $('#paperStyles').addEventListener('click', e => {
+    const b = e.target.closest('[data-ps]');
+    if (!b) return;
+    state.paperStyle = b.dataset.ps;
+    syncUI(); draw();
+  });
+  $('#allKids').addEventListener('click', () => {
+    state.kids = state.kids.length === students.length ? [] : students.map(s => s.id);
+    refreshPhrase(true); syncUI(); draw();
+  });
+  $('#modeSeg').addEventListener('change', e => {
+    state.mode = e.target.value;
+    refreshPhrase(true); syncUI(); draw();
+  });
+  $('#noText').addEventListener('change', e => {
+    state.noText = e.target.checked;
+    $('#phrase').disabled = $('#shuffle').disabled = state.noText;
+    saved = null; $('#batchPanel').classList.add('hidden');
+    draw();
+  });
   $('#shuffle').addEventListener('click', () => { state.phraseIdx++; refreshPhrase(true); draw(); });
   let typeTimer;
   $('#phrase').addEventListener('input', () => {
@@ -536,8 +618,13 @@ async function make(preId) {
   let saved = null;
   const ensure = async () => (saved ||= await finalImage());
   // Any change after saving means a new picture.
-  view.addEventListener('click', e => { if (e.target.closest('#kidStrip,#chips,#sceneStrip,#accStrip,#shuffle,#magicBtn')) saved = null; }, true);
-  $('#phrase').addEventListener('input', () => { saved = null; });
+  view.addEventListener('click', e => {
+    if (e.target.closest('#kidStrip,#chips,#sceneStrip,#accStrip,#paperStyles,#allKids,#shuffle,#magicBtn')) {
+      saved = null;
+      $('#batchPanel').classList.add('hidden');
+    }
+  }, true);
+  $('#phrase').addEventListener('input', () => { saved = null; $('#batchPanel').classList.add('hidden'); });
 
   $('#wa').addEventListener('click', async () => {
     const r = await ensure(); if (!r) return;
@@ -573,6 +660,106 @@ async function make(preId) {
     toast('انحفظت بأرشيف الطفل وعلى جهازك ⭐');
   });
 
+  // ---------- Whole class: one picture per child ----------
+  async function sendToParents(k, blob) {
+    const msg = parentMessage({ name: k.name, isGirl: isGirl(k), story: '', settings: cfg });
+    const file = new File([blob], `najmi-${k.name}.jpg`, { type: 'image/jpeg' });
+    if (canShareFiles(file)) return shareImage(file, msg);
+    downloadBlob(blob, file.name);
+    openWhatsApp(k.phone, msg);
+    return true;
+  }
+
+  let batch = [];
+  $('#batchBtn').addEventListener('click', async () => {
+    const ks = picked();
+    const panel = $('#batchPanel');
+    panel.classList.remove('hidden');
+    $('#batchBtn').disabled = true;
+    batch = [];
+    const skipped = [];
+    const c = document.createElement('canvas');
+    const createdAt = Date.now();
+    for (let i = 0; i < ks.length; i++) {
+      const k = ks[i];
+      panel.innerHTML = `<p class="status">لحظة، عم نجهّز صورة ${esc(k.name)} (${i + 1} من ${ks.length})... ⭐</p>
+        <div class="progress" style="margin:8px auto"><i style="width:${Math.round((i / ks.length) * 100)}%"></i></div>`;
+      if (!k.sticker) { skipped.push(k.name); continue; }
+      const phrase = phraseForKid(k);
+      try {
+        await compose(c, { ...sceneOpts(), stickers: [k.sticker], names: [k.name], phrase: state.noText ? '' : phrase });
+        const blob = await canvasBlob(c);
+        await db.saveStar({ id: db.uid(), studentId: k.id, createdAt, behavior: state.behavior, scene: state.magic ? 'magic' : state.sceneId, phrase, image: blob });
+        batch.push({ k, blob, sent: false });
+      } catch (e) {
+        console.warn(e);
+        skipped.push(k.name);
+      }
+    }
+    $('#batchBtn').disabled = false;
+    renderBatch(skipped);
+    celebrate();
+  });
+
+  function renderBatch(skipped = []) {
+    const panel = $('#batchPanel');
+    const next = batch.findIndex(b => !b.sent);
+    const multiShare = batch.length && canShareFiles(new File([batch[0].blob], 'x.jpg', { type: 'image/jpeg' }));
+    panel.innerHTML = `
+      <h3 style="margin-bottom:10px">🎉 جاهزين ${batch.length} صور</h3>
+      ${skipped.length ? `<p class="note" style="color:var(--coral-ink)">ما طلعت صورة لـ: ${skipped.map(esc).join('، ')} (لازم صورة للطفل)</p>` : ''}
+      <div class="send-row">
+        ${next >= 0
+          ? `<button class="btn mint block" id="seqBtn">📲 ابعتي لأهل ${esc(batch[next].k.name)} (${next + 1} من ${batch.length})</button>`
+          : `<p class="status">✅ انبعتوا كلهم! يعطيكِ العافية 💛</p>`}
+        <div class="two">
+          <button class="btn" id="zipBtn">📦 نزّلي الكل</button>
+          ${multiShare ? '<button class="btn" id="shareAll">📤 شاركي الكل</button>' : '<button class="btn" id="dlAll">💾 نزّلي وحدة وحدة</button>'}
+        </div>
+      </div>
+      <div class="gallery" style="margin-top:14px">
+        ${batch.map((b, i) => `<figure>
+          <img src="${blobURL('b-' + i, b.blob)}" alt="${esc(b.k.name)}">
+          <figcaption style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+            <b>${esc(b.k.name)} ${b.sent ? '✅' : ''}</b>
+            <button class="btn small mint" data-send="${i}" aria-label="ابعتي لأهل ${esc(b.k.name)}">📲</button>
+          </figcaption></figure>`).join('')}
+      </div>`;
+  }
+
+  async function sendOne(i) {
+    const b = batch[i];
+    if (!b) return;
+    const ok = await sendToParents(b.k, b.blob);
+    if (ok) { b.sent = true; toast(`وصلت لأهل ${b.k.name} 💛`); }
+    renderBatch();
+  }
+
+  $('#batchPanel').addEventListener('click', async e => {
+    if (e.target.closest('#seqBtn')) return sendOne(batch.findIndex(b => !b.sent));
+    const s = e.target.closest('[data-send]');
+    if (s) return sendOne(+s.dataset.send);
+    if (e.target.closest('#dlAll')) { batch.forEach((b, i) => setTimeout(() => downloadBlob(b.blob, `najmi-${b.k.name}.jpg`), i * 400)); return; }
+    if (e.target.closest('#shareAll')) {
+      const files = batch.map(b => new File([b.blob], `najmi-${b.k.name}.jpg`, { type: 'image/jpeg' }));
+      try { await navigator.share({ files }); } catch { /* closed */ }
+      return;
+    }
+    if (e.target.closest('#zipBtn')) {
+      try {
+        const JSZip = await loadJSZip();
+        const zip = new JSZip();
+        batch.forEach(b => zip.file(`${b.k.name}.jpg`, b.blob));
+        const blob = await zip.generateAsync({ type: 'blob' });
+        downloadBlob(blob, `نجوم-${cfg.className || 'الصف'}.zip`);
+        toast('نزلوا كلهم بملف واحد 📦');
+      } catch {
+        toast('ما زبط الملف، عم ننزّلهم وحدة وحدة');
+        batch.forEach((b, i) => setTimeout(() => downloadBlob(b.blob, `najmi-${b.k.name}.jpg`), i * 400));
+      }
+    }
+  });
+
   // first paint
   if (state.kids.length) {
     const k = picked()[0];
@@ -584,6 +771,18 @@ async function make(preId) {
   }
   syncUI();
   draw();
+}
+
+let jszip;
+function loadJSZip() {
+  if (window.JSZip) return Promise.resolve(window.JSZip);
+  return (jszip ||= new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    s.onload = () => resolve(window.JSZip);
+    s.onerror = () => { jszip = null; reject(new Error('zip')); };
+    document.head.appendChild(s);
+  }));
 }
 
 route();
