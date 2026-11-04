@@ -304,3 +304,7 @@ textarea.input { min-height: 90px; resize: vertical; line-height: 1.5; }
 @keyframes wobble { 0%, 100% { transform: rotate(-12deg); } 50% { transform: rotate(12deg); } }
 .btn.on { background: var(--coral); color: #fff; }
 .magic-box .btn:not(.primary), .magic-box .chip { background: #fff; box-shadow: 0 2px 0 #D9D3FF; }
+
+.prompt-box { background: #fff; border-radius: 16px; padding: 12px; margin-top: 10px; }
+.prompt-box textarea { font-family: ui-monospace, Consolas, monospace; font-size: 13px; min-height: 120px; text-align: left; }
+.steps { margin: 10px 0 0; padding-inline-start: 22px; font-size: 15px; line-height: 1.8; }

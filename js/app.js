@@ -4,7 +4,7 @@ import { getScenes, getScene, sceneURL, sceneOverlayURL, matchScene, normalize, 
 import { shrink, smartCutout, circleSticker } from './cutout.js';
 import { compose, fontsReady, canvasBlob } from './compose.js';
 import { listen, voiceSupported, voiceError } from './voice.js';
-import { findLetter, drawLetterBadge, LETTERS } from './magic.js';
+import { findLetter, drawLetterBadge, LETTERS, buildImagePrompt, DRAW_URL, drawWithAI } from './magic.js';
 import { shareImage, openWhatsApp, openFacebook, downloadBlob, canShareFiles } from './share.js';
 
 const view = document.getElementById('view');
@@ -367,6 +367,22 @@ async function make(preId) {
             <button class="btn primary block" id="magicGo">✨ لاقيلي المشهد</button>
             <div class="magic-grid" id="magicGrid"></div>
             <p class="note" id="magicNote" style="margin:8px 0 0"></p>
+            ${DRAW_URL ? '<button class="btn mint block" id="drawGo" style="margin-top:10px">🎨 ارسميلي ٤ صور جديدة</button>' : ''}
+            <button class="btn small block" id="promptGo" style="margin-top:10px">✍️ اعمليلي برومبت لصورة جديدة</button>
+            <div class="prompt-box hidden" id="promptBox">
+              <p style="margin:0 0 6px;font-weight:700">✍️ البرومبت جاهز</p>
+              <textarea class="input" id="promptText" rows="6" dir="ltr" readonly></textarea>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+                <button class="btn small mint" id="copyPrompt">📋 انسخي</button>
+                <a class="btn small" id="openGemini" href="https://gemini.google.com/app" target="_blank" rel="noopener">✨ افتحي Gemini</a>
+              </div>
+              <ol class="steps">
+                <li>كبسي <b>انسخي</b></li>
+                <li>افتحي <b>Gemini</b> أو ChatGPT، والصقي البرومبت، واستني الصورة</li>
+                <li>نزّلي الصورة على موبايلك</li>
+                <li>ارجعي هون وكبسي <b>🖼️ من الصور</b> تحت 👇</li>
+              </ol>
+            </div>
             <p style="margin:14px 0 8px;font-weight:700">📷 أو خلفية من عندك</p>
             <div class="two" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
               <label class="btn small">📸 صوّري خلفية<input type="file" accept="image/*" capture="environment" id="bgCam" hidden></label>
@@ -632,6 +648,65 @@ async function make(preId) {
     makeMagic();
   });
   $('#magicGo').addEventListener('click', () => makeMagic());
+
+  // Draw 4 new pictures with our own server. Only the scene description is sent.
+  let drawRun = 0;
+  async function drawNew() {
+    let desc = ($('#magicText').value || '').trim();
+    if (!desc) { $('#magicNote').textContent = 'احكي أو اكتبي وصف المشهد فوق أول 👆'; $('#magicText').focus(); return; }
+    students.forEach(st => { desc = desc.split(st.name).join(''); });
+    desc = desc.trim();
+    const run = ++drawRun;
+    const letter = findLetter(desc);
+    const grid = $('#magicGrid');
+    grid.innerHTML = [0, 1, 2, 3].map(i => `<button class="magic-opt" data-i="${i}" aria-pressed="false" disabled><span class="spin">🎨</span></button>`).join('');
+    $('#magicNote').textContent = 'عم نرسم ٤ صور... كل وحدة بتاخد كم ثانية 🎨';
+    $('#drawGo').disabled = true;
+    let done = 0;
+    for (let i = 0; i < 4; i++) {
+      if (run !== drawRun) return;
+      const b = grid.querySelector(`[data-i="${i}"]`);
+      try {
+        const blob = await drawWithAI(desc, Math.floor(Math.random() * 1e9));
+        if (run !== drawRun) return;
+        const url = blobURL('ai-' + i, blob);
+        b.innerHTML = `<img src="${url}" alt="">`;
+        b.dataset.pick = url; b.dataset.letter = letter ? letter[1] : ''; b.dataset.local = '1';
+        b.disabled = false;
+        done++;
+        $('#magicNote').textContent = done < 4 ? `جاهزين ${done} من ٤، كبسي على اللي بتحبيها 👆` : 'كبسي على الصورة اللي بتحبيها 👆';
+        if (done === 1) pick(b);
+      } catch (e) {
+        b.innerHTML = '<span class="spin">😕</span>';
+        $('#magicNote').textContent = e.message === 'limit'
+          ? 'خلص رصيد الرسم المجاني لليوم 😊 جرّبي بكرا، أو استعملي البرومبت تحت'
+          : 'في صورة ما زبطت. تأكدي من الإنترنت وجرّبي كمان مرة';
+        if (e.message === 'limit') break;
+      }
+    }
+    if (run === drawRun) $('#drawGo').disabled = false;
+  }
+  $('#drawGo')?.addEventListener('click', drawNew);
+
+  // Ready prompt the teacher can paste into Gemini / ChatGPT, then bring the picture back.
+  function showPrompt(desc) {
+    $('#promptText').value = buildImagePrompt(desc);
+    $('#promptBox').classList.remove('hidden');
+    $('#promptBox').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  $('#promptGo').addEventListener('click', () => {
+    let desc = ($('#magicText').value || '').trim();
+    if (!desc) { $('#magicNote').textContent = 'احكي أو اكتبي وصف المشهد فوق أول، وبعدين كبسي هون 👆'; $('#magicText').focus(); return; }
+    students.forEach(st => { desc = desc.split(st.name).join(''); });
+    showPrompt(desc.trim());
+  });
+  $('#copyPrompt').addEventListener('click', async () => {
+    const text = $('#promptText').value;
+    try { await navigator.clipboard.writeText(text); }
+    catch { $('#promptText').select(); document.execCommand('copy'); }
+    $('#copyPrompt').textContent = '✅ انتسخ!';
+    setTimeout(() => { $('#copyPrompt').textContent = '📋 انسخي'; }, 2000);
+  });
   $('#magicText').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); makeMagic(); } });
 
   let magicRec = null;
@@ -667,7 +742,8 @@ async function make(preId) {
     } else {
       const sc = matchScene(desc);
       if (!sc) {
-        $('#magicNote').textContent = 'ما عندي هالمشهد لسّا 😊 صوّري خلفية من عندك أو اختاري من الصور 👇';
+        $('#magicNote').textContent = 'ما عندي هالمشهد جاهز 😊 بس عملتلك برومبت، فيكِ ترسميه بـ Gemini 👇';
+        showPrompt(desc);
         return;
       }
       setScene(sc.id, true);
@@ -678,7 +754,7 @@ async function make(preId) {
     document.querySelector(`#sceneStrip [data-scene="${state.sceneId}"]`)?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
   }
   function pick(b) {
-    state.magic = { url: b.dataset.pick, letter: b.dataset.letter || null };
+    state.magic = { url: b.dataset.pick, letter: b.dataset.letter || null, local: b.dataset.local === '1' };
     saved = null; $('#batchPanel').classList.add('hidden');
     syncUI(); draw();
   }
