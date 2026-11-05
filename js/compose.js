@@ -87,8 +87,10 @@ export async function compose(canvas, o) {
         const im = imgs[i];
         const lim = paper ? cellH * 0.7 : cellH * 0.96;
         const k = Math.min(lim / im.height, (cellW * 0.94) / im.width);
-        const w = im.width * k, h = im.height * k;
-        const full = paper ? paperGeom(pStyle, { x: 0, y: 0, w, h }).bottom : h;
+        let w = im.width * k, h = im.height * k;
+        let full = paper ? paperGeom(pStyle, { x: 0, y: 0, w, h }).bottom : h;
+        // Child plus paper must fit inside its own row, so nobody's paper covers a face below.
+        if (full > cellH * 0.98) { const f = (cellH * 0.98) / full; w *= f; h *= f; full *= f; }
         boxes.push({ x: rowX + c * cellW + (cellW - w) / 2, y: top + r * cellH + (cellH - full), w, h });
       }
     }
